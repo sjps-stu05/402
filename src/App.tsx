@@ -2262,8 +2262,9 @@ export default function App() {
         },
         body: JSON.stringify({ entries: data.passportEntries }),
       });
-      if (!response.ok) {
-        throw new Error('伺服器連線異常，請稍後再試。');
+      const contentType = response.headers.get('content-type') || '';
+      if (!response.ok || !contentType.includes('application/json')) {
+        throw new Error('AI 週報功能目前未開放（此網站沒有後端伺服器）。');
       }
       const resData = await response.json();
       if (resData.error) {
