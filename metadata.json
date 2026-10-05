@@ -1,0 +1,12 @@
+{
+  "name": "Remix  402情緒氣象台",
+  "description": "專為國小老師設計的社會情緒學習 (SEL) 班級經營與研究工具。",
+  "requestFramePermissions": [
+    "microphone",
+    "serial",
+    "bluetooth"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

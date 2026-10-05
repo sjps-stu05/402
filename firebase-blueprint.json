@@ -1,0 +1,71 @@
+{
+  "entities": {
+    "Student": {
+      "title": "Student",
+      "description": "Student information and status.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "status": { "type": "string", "enum": ["focus", "quiet", "help"] },
+        "avatar": { "type": "string", "description": "Base64 encoded avatar image" }
+      },
+      "required": ["id", "name", "status"]
+    },
+    "DailyMood": {
+      "title": "DailyMood",
+      "description": "Aggregated mood for all students on a specific date.",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string", "format": "date" },
+        "moods": { 
+          "type": "object", 
+          "description": "Mapping of studentId to MoodType" 
+        }
+      },
+      "required": ["date", "moods"]
+    },
+    "PassportEntry": {
+      "title": "PassportEntry",
+      "description": "A student's incident report and mood repair log.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "timestamp": { "type": "number" },
+        "incident": { "type": "string" },
+        "mood": { "type": "string" },
+        "result": { "type": "string" },
+        "studentId": { "type": "string" },
+        "studentName": { "type": "string" },
+        "image": { "type": "string", "description": "Base64 encoded custom image attachment" }
+      },
+      "required": ["id", "timestamp", "incident", "mood", "result", "studentId", "studentName"]
+    },
+    "AppMetadata": {
+      "title": "AppMetadata",
+      "description": "Global application settings and assets.",
+      "type": "object",
+      "properties": {
+        "classroomImage": { "type": "string", "description": "Base64 encoded classroom banner image" }
+      }
+    }
+  },
+  "firestore": {
+    "students": {
+      "schema": "Student",
+      "description": "Collection of students in the class."
+    },
+    "moodHistory": {
+      "schema": "DailyMood",
+      "description": "Collection of daily moods indexed by date."
+    },
+    "passportEntries": {
+      "schema": "PassportEntry",
+      "description": "Collection of incident and mood repair logs."
+    },
+    "metadata": {
+      "schema": "AppMetadata",
+      "description": "Singleton doc for global class metadata."
+    }
+  }
+}

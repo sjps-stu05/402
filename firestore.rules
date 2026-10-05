@@ -1,0 +1,91 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email.lower() == 'mindy6612598@sjps.kh.edu.tw' ||
+        request.auth.token.email.lower() == 's25732102@stu.edu.tw' ||
+        request.auth.token.email.lower().matches('.*@(sjps\\.kh\\.edu\\.tw|stu\\.edu\\.tw)$')
+      );
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Students collection
+    match /students/{studentId} {
+      allow read: if true; // Allow students to see themselves and others for state
+
+      function isValidStudent(data) {
+        return data.id is string && data.id.size() <= 64
+               && data.name is string && data.name.size() <= 100
+               && data.status in ['focus', 'quiet', 'help']
+               && (!('avatar' in data) || (data.avatar is string && data.avatar.size() <= 2000000)); // ~2MB for base64
+      }
+
+      allow create: if isValidId(studentId) && isValidStudent(request.resource.data);
+      allow update: if isValidId(studentId) && isValidStudent(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    // Mood History
+    match /moodHistory/{date} {
+      allow read: if true;
+
+      function isValidMoodHistory(data) {
+        return data.date is string && data.date.size() <= 20 && data.moods is map;
+      }
+
+      allow create, update: if isValidMoodHistory(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    // Passport Entries
+    match /passportEntries/{entryId} {
+      allow read: if true;
+
+      function isValidPassportEntry(data) {
+        return data.id is string && data.id.size() <= 64 
+               && data.timestamp is number 
+               && data.incident is string && data.incident.size() <= 5000
+               && data.mood is string && data.mood in ['sun', 'cloud', 'rain', 'storm']
+               && data.result is string && data.result.size() <= 5000 
+               && data.studentId is string && data.studentId.size() <= 64
+               && (!('studentName' in data) || (data.studentName is string && data.studentName.size() <= 100))
+               && (!('image' in data) || (data.image is string && data.image.size() <= 2000000));
+      }
+
+      allow create: if isValidId(entryId) && isValidPassportEntry(request.resource.data);
+      allow update: if isAdmin() && isValidPassportEntry(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    // Metadata
+    match /metadata/{docId} {
+      allow read: if true;
+
+      function isValidMetadata(data) {
+        return !('classroomImage' in data) || (data.classroomImage is string && data.classroomImage.size() <= 2000000);
+      }
+
+      allow create, update: if isValidId(docId) && isValidMetadata(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    // Test connection doc
+    match /test/connection {
+      allow read: if true;
+    }
+  }
+}

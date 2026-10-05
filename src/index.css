@@ -1,0 +1,118 @@
+@import "tailwindcss";
+
+@theme {
+  --font-serif: "Playfair Display", serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+@layer base {
+  body {
+    @apply font-sans antialiased bg-[#FDFCF9];
+  }
+  
+  h1, h2, h3, h4 {
+    @apply font-serif;
+  }
+}
+
+@layer utilities {
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 4px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: #e2e8f0;
+    border-radius: 20px;
+  }
+
+  @keyframes waveGradient {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+
+  .animate-wave-gradient {
+    background-size: 300% 300%;
+    animation: waveGradient 20s ease infinite;
+  }
+
+  @keyframes breatheGlowRed {
+    0%, 100% {
+      box-shadow: 0 0 4px rgba(220, 38, 38, 0.2), 0 4px 6px -1px rgba(220, 38, 38, 0.1);
+      transform: scale(1);
+    }
+    50% {
+      box-shadow: 0 0 16px rgba(220, 38, 38, 0.5), 0 0 28px rgba(220, 38, 38, 0.25);
+      transform: scale(1.035);
+    }
+  }
+
+  @keyframes breatheGlowAmber {
+    0%, 100% {
+      box-shadow: 0 0 4px rgba(245, 158, 11, 0.2), 0 4px 6px -1px rgba(245, 158, 11, 0.1);
+      transform: scale(1);
+    }
+    50% {
+      box-shadow: 0 0 16px rgba(245, 158, 11, 0.5), 0 0 28px rgba(245, 158, 11, 0.25);
+      transform: scale(1.035);
+    }
+  }
+
+  .animate-breath-red {
+    animation: breatheGlowRed 2.2s ease-in-out infinite;
+  }
+
+  .animate-breath-amber {
+    animation: breatheGlowAmber 2.2s ease-in-out infinite;
+  }
+}
+
+@media print {
+  body {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+  }
+  
+  /* Hide everything on the page except the printable report */
+  #root, #root *, header, main, footer, .fixed {
+    visibility: hidden !important;
+  }
+  
+  /* Selectively make the printable area and all its descendants visible */
+  #report-printable-area, #report-printable-area * {
+    visibility: visible !important;
+  }
+  
+  /* Position the printable area at the absolute top-left of the paper */
+  #report-printable-area {
+    position: fixed !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 210mm !important;
+    height: 297mm !important;
+    padding: 20mm !important;
+    margin: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: white !important;
+    z-index: 99999 !important;
+  }
+  
+  /* Optimize page setup */
+  @page {
+    size: A4 portrait;
+    margin: 0;
+  }
+}
+
