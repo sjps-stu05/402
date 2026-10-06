@@ -1613,11 +1613,11 @@ export default function App() {
 
     const unsubStudents = DataService.subscribeStudents((students) => {
       if (students.length === 0) {
-        DataService.syncAll(INITIAL_DATA).then(() => {
-          // SyncAll will trigger subscriptions again
-        }).catch(err => {
-          console.warn("Could not initial sync to Firestore:", err);
-        });
+        if (isAdmin) {
+          DataService.syncAll(INITIAL_DATA).catch(err => {
+            console.warn("Could not initial sync to Firestore:", err);
+          });
+        }
         setData(prev => {
           const next = { ...prev, students: INITIAL_DATA.students };
           try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch (e) {}
@@ -1630,13 +1630,13 @@ export default function App() {
 
       const existingIds = new Set(students.map(s => s.id));
       const missing = INITIAL_DATA.students.filter(s => !existingIds.has(s.id));
-      if (missing.length > 0) {
+      if (isAdmin && missing.length > 0) {
         missing.forEach(s => {
           DataService.saveStudent(s).catch(console.error);
         });
       }
       students.forEach(s => {
-        if (s.id.toLowerCase() === '9bkwscjg4') {
+        if (isAdmin && s.id.toLowerCase() === '9bkwscjg4') {
           DataService.deleteStudent(s.id).catch(console.error);
         }
       });
@@ -1898,7 +1898,7 @@ export default function App() {
 
     triggerSuccess();
     try {
-      await DataService.saveStudent(updatedStudent);
+      await DataService.updateStudentStatus(studentId, status);
       setDbStatus('connected');
     } catch (err) {
       console.warn('Student status saved locally:', err);
@@ -1981,6 +1981,11 @@ export default function App() {
 
   // Restore all students' original personal avatars
   const handleRestoreDefaultAvatars = async () => {
+    if (!isAdmin) {
+      alert('只有老師（管理員）登入後才能使用這個功能。');
+      return;
+    }
+    if (!window.confirm('這會把全班頭像全部換回原本的預設頭像，確定要執行嗎？')) return;
     setIsSyncing(true);
     try {
       const restoredStudents = (defaultStudents as Student[]).map(ds => {
@@ -2019,11 +2024,19 @@ export default function App() {
 
   // Reorganize and repair system function
   const handleSystemReorganizeAndRepair = async () => {
+    if (!isAdmin) {
+      alert('只有老師（管理員）登入後才能使用這個功能。');
+      return;
+    }
     setIsSyncing(true);
     try {
       // 1. Ensure all baseline students are in Firestore with their original avatars
+      const existingNow = await DataService.getStudents();
+      const existingIdSet = new Set(existingNow.map(x => x.id));
       for (const student of defaultStudents) {
-        await DataService.saveStudent(student as Student);
+        if (!existingIdSet.has((student as Student).id)) {
+          await DataService.saveStudent(student as Student);
+        }
       }
       
       // 2. Clear out any ghost IDs
@@ -2590,7 +2603,8 @@ export default function App() {
           </div>
 
           <div className="flex flex-wrap items-center gap-3 self-start md:self-center">
-            <button
+            {isAdmin && (
+<button
               onClick={handleSystemReorganizeAndRepair}
               disabled={isSyncing}
               className="flex items-center gap-2 px-5 py-3.5 bg-white/95 hover:bg-white text-slate-800 font-bold text-xs rounded-2xl shadow-sm border border-slate-200/80 hover:shadow-md transition-all active:scale-95 cursor-pointer disabled:opacity-50"
@@ -2599,6 +2613,7 @@ export default function App() {
               <RefreshCw className={`w-4 h-4 text-teal-600 ${isSyncing ? 'animate-spin' : ''}`} />
               <span>{isSyncing ? '系統重新整理中...' : '重新整理系統'}</span>
             </button>
+)}
 
             {(view === 'student' || view === 'teacher') && (
               <div className="flex items-center gap-4 bg-white px-6 py-3.5 rounded-2xl border border-slate-200 shadow-sm">
@@ -4276,7 +4291,7 @@ export default function App() {
                                     students: prev.students.map(x => x.id === currentStudent.id ? updatedStudent : x)
                                   }));
                                   setCurrentStudent(updatedStudent);
-                                  DataService.saveStudent(updatedStudent);
+                                  DataService.updateStudentStatus(currentStudent.id, s.id as 'focus' | 'quiet' | 'help').catch(console.error);
                                   triggerSuccess();
                                 }}
                                 className={`p-6 rounded-3xl border-2 transition-all flex flex-col items-center gap-3 ${
@@ -4566,7 +4581,8 @@ export default function App() {
                     </div>
                     
                     <div className="flex flex-wrap items-center gap-3">
-                      <button 
+                      {isAdmin && (
+<button 
                         onClick={handleSystemReorganizeAndRepair}
                         disabled={isSyncing}
                         className="px-6 py-3 bg-teal-600 text-white rounded-2xl font-bold shadow-lg shadow-teal-100 hover:bg-teal-700 transition-all flex items-center gap-2 active:scale-95 disabled:opacity-50 cursor-pointer"
@@ -4575,6 +4591,7 @@ export default function App() {
                         <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
                         <span>{isSyncing ? '系統整理與修復中...' : '重新整理系統與同步'}</span>
                       </button>
+)}
 
                       {!user && (
                         <button 
@@ -4621,7 +4638,8 @@ export default function App() {
                       學生名單管理
                     </h3>
                     <div className="flex flex-wrap gap-2">
-                      <button 
+                      {isAdmin && (
+<button 
                         onClick={handleRestoreDefaultAvatars}
                         disabled={isSyncing}
                         className="text-[10px] font-bold text-white bg-teal-600 px-3 py-2 rounded-xl hover:bg-teal-700 transition-all disabled:opacity-50 cursor-pointer flex items-center gap-1.5 shadow-sm"
@@ -4630,6 +4648,7 @@ export default function App() {
                         <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
                         <span>恢復全班原本頭像</span>
                       </button>
+)}
                       <button 
                         onClick={() => handleBulkAvatarInit(1, 17)}
                         disabled={isSyncing}
