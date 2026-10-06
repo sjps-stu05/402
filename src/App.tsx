@@ -2256,22 +2256,7 @@ export default function App() {
     setIsGeneratingReport(true);
     setReportError(null);
     try {
-      const response = await fetch('/api/gemini/summarize', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ entries: data.passportEntries }),
-      });
-      const contentType = response.headers.get('content-type') || '';
-      if (!response.ok || !contentType.includes('application/json')) {
-        throw new Error('AI 週報功能目前未開放（此網站沒有後端伺服器）。');
-      }
-      const resData = await response.json();
-      if (resData.error) {
-        throw new Error(resData.error);
-      }
-      const text = resData.text || '';
+      const text = await summarizeSELReport(data.passportEntries);
       setSummaryReport(text);
       localStorage.setItem('sel_ai_summary_report', text);
       triggerSuccess();
