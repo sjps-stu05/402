@@ -1,6 +1,6 @@
 // 純前端 Gemini 呼叫模組（金鑰不寫在程式碼裡，由老師第一次使用時輸入，只存在這台裝置的瀏覽器）
-const KEY_STORAGE = 'gemini_api_key';
-const MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash'];
+const KEY_STORAGE = 'AQ.Ab8RN6K3E4XOsiOeAa0yEfKSR2xkPwAI9yyD838vwZQLhd9BXw';
+const API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
 export function clearGeminiKey() {
   try {
@@ -28,45 +28,97 @@ function getApiKey(): string {
   return key;
 }
 
+// 向 Google 查詢「目前這把金鑰可用」的 Flash 模型，避免寫死的模型名稱被停用後 404
+function rankModels(models: any[]): string[] {
+  const scored: { name: string; rank: number; ver: number }[] = [];
+  for (const m of models) {
+    const name: string = String(m.name || '').replace(/^models\//, '');
+    const methods: string[] = m.supportedGenerationMethods || [];
+    if (!methods.includes('generateContent')) continue;
+    if (/image|live|audio|tts|embed|robot|computer|native|imagen|veo|lyria|thinking/i.test(name)) continue;
+    const match = name.match(/^gemini-(\d+(?:\.\d+)?)-flash(-lite)?(-preview.*)?$/);
+    if (!match) continue;
+    const ver = parseFloat(match[1]);
+    const isLite = Boolean(match[2]);
+    const isPreview = Boolean(match[3]);
+    // 先用正式版 Flash，其次 Flash-Lite，最後才是 preview 版
+    const rank = (isPreview ? 4 : 0) + (isLite ? 2 : 0);
+    scored.push({ name, rank, ver });
+  }
+  scored.sort((a, b) => a.rank - b.rank || b.ver - a.ver);
+  return scored.map(x => x.name);
+}
+
+async function getCandidateModels(apiKey: string): Promise<string[]> {
+  try {
+    const cached = sessionStorage.getItem('gemini_models');
+    if (cached) {
+      const list = JSON.parse(cached);
+      if (Array.isArray(list) && list.length) return list;
+    }
+  } catch {}
+
+  const res = await fetch(`${API_BASE}/models?pageSize=1000`, {
+    headers: { 'x-goog-api-key': apiKey },
+  });
+  if (res.status === 400 || res.status === 401 || res.status === 403) {
+    clearGeminiKey();
+    throw new Error('Gemini API 金鑰無效或沒有權限，請重新按一次並輸入正確的金鑰。');
+  }
+  if (!res.ok) {
+    throw new Error(`無法取得 AI 模型清單（${res.status}），請稍後再試。`);
+  }
+  const json = await res.json();
+  const ranked = rankModels(json?.models || []).slice(0, 4);
+  if (!ranked.length) {
+    throw new Error('這把金鑰目前找不到可用的 Gemini 模型，請確認金鑰是在 Google AI Studio 建立的。');
+  }
+  try {
+    sessionStorage.setItem('gemini_models', JSON.stringify(ranked));
+  } catch {}
+  return ranked;
+}
+
 async function generateText(prompt: string, generationConfig: Record<string, unknown> = {}): Promise<string> {
   const apiKey = getApiKey();
+  const models = await getCandidateModels(apiKey);
   let lastError: Error | null = null;
 
-  for (const model of MODELS) {
+  for (const model of models) {
     try {
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-goog-api-key': apiKey,
-          },
-          body: JSON.stringify({
-            contents: [{ role: 'user', parts: [{ text: prompt }] }],
-            generationConfig,
-          }),
-        }
-      );
+      const res = await fetch(`${API_BASE}/models/${model}:generateContent`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': apiKey,
+        },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          generationConfig,
+        }),
+      });
 
-      if (res.status === 400 || res.status === 401 || res.status === 403) {
-        const body = await res.json().catch(() => ({}));
-        const msg: string = body?.error?.message || '';
-        if (/api key|permission|unauthenticated|invalid/i.test(msg) || res.status !== 400) {
-          clearGeminiKey();
-          throw new Error('Gemini API 金鑰無效或沒有權限，請重新按一次並輸入正確的金鑰。');
-        }
-        throw new Error(msg || `AI 服務回應錯誤（${res.status}）`);
+      if (res.status === 401 || res.status === 403) {
+        clearGeminiKey();
+        throw new Error('Gemini API 金鑰無效或沒有權限，請重新按一次並輸入正確的金鑰。');
+      }
+
+      if (res.status === 404) {
+        // 這個模型已被停用，清掉快取，改試下一個
+        try { sessionStorage.removeItem('gemini_models'); } catch {}
+        lastError = new Error(`模型 ${model} 已無法使用，改試其他模型。`);
+        continue;
       }
 
       if (!res.ok) {
-        lastError = new Error(`AI 服務暫時無法使用（${res.status}），改用備用模型。`);
+        const body = await res.json().catch(() => ({}));
+        lastError = new Error(body?.error?.message || `AI 服務暫時無法使用（${res.status}）。`);
         continue;
       }
 
       const json = await res.json();
       const parts = json?.candidates?.[0]?.content?.parts || [];
-      const text = parts.map((p: any) => p.text || '').join('').trim();
+      const text = parts.filter((p: any) => !p.thought).map((p: any) => p.text || '').join('').trim();
       if (!text) {
         lastError = new Error('AI 沒有回傳內容，請稍後再試。');
         continue;
@@ -125,7 +177,7 @@ export async function getDailyJoke(): Promise<string> {
   try {
     return await generateText(
       '請跟我說一個適合國小學生的笑話，要幽默且正向。只需要回傳笑話內容。',
-      { temperature: 0.8, maxOutputTokens: 200 }
+      { temperature: 0.8, maxOutputTokens: 1000 }
     );
   } catch {
     return '祝大家今天都有好心情！';
