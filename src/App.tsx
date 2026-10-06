@@ -1,3 +1,4 @@
+import { summarizeSELReport, getDailyJoke } from './lib/gemini';
 import React, { useState, useEffect, useMemo, FormEvent, ChangeEvent, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
