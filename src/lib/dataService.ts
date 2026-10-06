@@ -168,6 +168,16 @@ export const DataService = {
     }
   },
 
+  // 只更新狀態欄位，不會覆蓋頭像等其他資料
+  async updateStudentStatus(id: string, status: 'focus' | 'quiet' | 'help'): Promise<void> {
+    const path = `students/${id}`;
+    try {
+      await updateDoc(doc(db, 'students', id), { status });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, path);
+    }
+  },
+
   async deleteStudent(id: string): Promise<void> {
     const path = `students/${id}`;
     try {
